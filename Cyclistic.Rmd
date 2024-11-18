@@ -1,0 +1,261 @@
+---
+title: "Cyclistic"
+author: "Zimuzo Obi"
+date: "2024-11-15"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Case study: How does a bike-share navigate speedy success?
+
+### Background
+
+In 2016, Cyclistic launched a successful bike-share o ering. Since then, the program has grown to a feet of 5,824 bicycles that are geo-tracked and locked into a network of 692 stations across **Chicago**. The bikes can be unlocked from one station and returned to any other station in the system anytime. Until now, Cyclistic’s marketing strategy relied on building general awareness and appealing to broad consumer segments. One approach that helped make these things possible was the flexibility of its pricing plans: single-ride passes, full-day passes, and annual memberships. Customers who purchase single-ride or full-day passes are referred to as **casual riders**. Customers who purchase annual memberships are **Cyclistic members**.
+
+### Objectives
+
+The objective of this analysis is to explore historical bike trip data from Cyclistic to uncover key differences between casual riders and annual members. By understanding these differences, we aim to identify trends and behaviors that could inform targeted marketing strategies designed to convert casual riders into annual members. Ultimately, this analysis will help guide Cyclistic’s efforts in maximizing the number of annual memberships, which are more profitable than single-ride or full-day passes.
+
+Three questions will guide the future marketing program:
+
+1.  How do annual members and casual riders use Cyclistic bikes differently?
+2.  Why would casual riders buy Cyclistic annual memberships?
+3.  How can Cyclistic use digital media to influence casual riders to become members?
+
+### Shareholders
+
+-   Cyclistic Users
+-   Lily Moreno - Director of Marketing and Manager
+-   Cyclistic marketing analytics team
+-   Cyclistic executive team
+
+### Data Sources
+
+The data has been made available by Motivate International Inc. under this [licence](https://divvybikes.com/data-license-agreement). You can download the [12 months (year 2021) of Cyclistic trip data here](https://divvy-tripdata.s3.amazonaws.com/index.html).
+
+#### **Tools for analysis**
+
+I decided to use R to practice my learning from the data analytics course and additionally, due to the data size needed for the analysis.
+
+### Documentation of preparation, cleaning or manipulation of data
+
+#### **Preparation**
+
+```{r message=FALSE, warning=FALSE}
+# Load libraries used for the analyses
+
+library(tidyverse)
+library(lubridate)
+library(janitor)
+library(dplyr)
+library(ggplot2)
+library(hms)
+```
+
+**Import the datasets**
+
+```{r}
+# 12 datasets from each month in the year 2021
+trip01 <- read.csv('datasets/202101-divvy-tripdata.csv')
+trip02 <- read.csv('datasets/202102-divvy-tripdata.csv')
+trip03 <- read.csv('datasets/202103-divvy-tripdata.csv')
+trip04 <- read.csv('datasets/202104-divvy-tripdata.csv')
+trip05 <- read.csv('datasets/202105-divvy-tripdata.csv')
+trip06 <- read.csv('datasets/202106-divvy-tripdata.csv')
+trip07 <- read.csv('datasets/202107-divvy-tripdata.csv')
+trip08 <- read.csv('datasets/202108-divvy-tripdata.csv')
+trip09 <- read.csv('datasets/202109-divvy-tripdata.csv')
+trip10 <- read.csv('datasets/202110-divvy-tripdata.csv')
+trip11 <- read.csv('datasets/202111-divvy-tripdata.csv')
+trip12 <- read.csv('datasets/202112-divvy-tripdata.csv')
+```
+
+**Combine the datasets**
+
+```{r}
+#Combine all trip datasets
+all_trips <- rbind(trip01, trip02, trip03, trip04, trip05, trip06, trip07, trip08, trip09, trip10, trip11, trip12)
+```
+
+**Select Columns needed for analysis**
+
+```{r}
+all_trips <- all_trips %>%
+  select(ride_id, rideable_type, started_at, ended_at, start_station_name, end_station_name, member_casual)
+```
+
+**Split the started_at into separate columns of started_time and started_date**
+
+```{r}
+all_trips <- all_trips %>% 
+  separate(started_at, into = c('started_date', 'started_time'), sep= " ")
+```
+
+**Split the ended_at into separate columns of ended_time and ended_date**
+
+```{r}
+all_trips <- all_trips %>% 
+  separate(ended_at, into = c('ended_date', 'ended_time'), sep= " ") 
+```
+
+**Change the data types of the started and end date and time column**
+
+```{r warning=FALSE}
+#Started date
+all_trips$started_date <- as.Date(all_trips$started_date, format = "%Y-%m-%d")
+
+#Ended date
+all_trips$ended_date <- as.Date(all_trips$ended_date, format = "%Y-%m-%d")
+
+#Started time
+all_trips$started_time <- hms::as.hms(all_trips$started_time)
+
+#Ended time
+all_trips$ended_time <- hms::as.hms(all_trips$ended_time)
+```
+
+**Edge case of when ride spans into next day.**
+
+This helps with calculation of the ride duration coming up ahead.
+
+```{r}
+#Changing the new day time to 24 hr time format.
+all_trips$ended_time[all_trips$ended_time < all_trips$started_time] <- 
+  all_trips$ended_time[all_trips$ended_time < all_trips$started_time] + as.hms(24 * 60 * 60)
+```
+
+**Calculate time duration for each ride**
+
+```{r}
+#Time duration rounded to 2 decimal places
+all_trips$ride_duration <- as.numeric(round(difftime(all_trips$ended_time,all_trips$started_time, units = "mins"), digits = 2))
+```
+
+**Day of week and Month ride rental calculation**
+
+```{r}
+#Month
+all_trips$month <- format(all_trips$started_date, "%B")
+
+#Day
+all_trips$day <- weekdays(all_trips$started_date)
+```
+
+**Structure of the transformed dataset**
+
+```{r}
+str(all_trips)
+
+head(all_trips)
+```
+
+**Extract the transformed dataset**
+
+```{r}
+# write.csv(all_trips, '~path/name.csv', row.names = FALSE)
+```
+
+### Supporting visualizations and key findings
+
+**Get empty ride end stations**
+
+```{r}
+empty_end_trips <- all_trips %>% 
+  filter(is.na(end_station_name) | end_station_name == "")
+
+table(empty_end_trips$member_casual)
+```
+
+**Average duration of all rides**
+
+```{r}
+all_trips %>% summarise(avg_duration = mean(ride_duration))
+```
+
+**Average duration of rides by membership types**
+
+```{r}
+#Get the ride duration grouped by membership types
+avg_ride_duration <- all_trips %>% 
+  group_by(member_casual) %>% 
+  summarise(avg_ride_duration = mean(ride_duration))
+
+#Plotting
+ggplot(avg_ride_duration, aes(x = member_casual,y = avg_ride_duration, fill = member_casual)) + 
+  geom_bar(position = 'dodge', stat = 'identity', width = 0.5) + 
+  #scale_fill_manual(values = c("casual" = "skyblue", "member" = "coral")) +
+  geom_text(aes(label = round(avg_ride_duration, 1)), vjust = 1.5, size = 3) +
+  labs(title = "Average ride between membership types", x = "Membership type", y = "Average ride duration", fill = "Membership type") +
+  theme_minimal()
+```
+
+**Types of bikes available for rental (percentages)**
+
+```{r}
+bikes <- table(all_trips$rideable_type)
+
+percent_of_biketypes <- round(bikes / sum(bikes) * 100, 1)
+
+pie(bikes, main = "Rented Bike Types distribution", labels = paste(names(bikes), percent_of_biketypes, "%"), col = rainbow(n=3, alpha = 0.2))
+```
+
+**Rideable bike rentals by membership types**
+
+```{r}
+
+bikes_type_by_members <- all_trips %>% 
+  group_by(member_casual) %>% 
+  count(rideable_type)
+
+ggplot(bikes_type_by_members, aes(fill=member_casual, x=rideable_type, y = n)) + 
+  geom_bar(position='dodge', stat='identity') +
+  labs(title = "Bike type usage by membership type", x = "Bike Types", y = "Bike count", fill = "Membership type") +
+  theme_minimal()
+```
+
+**Monthly ride rentals**
+
+```{r}
+month_usage <- all_trips %>% 
+  group_by(member_casual) %>% 
+  count(month)
+
+ggplot(month_usage, aes(fill=member_casual, x= factor(month, levels = month.name), y = n)) + 
+  geom_bar(position='dodge', stat='identity') +
+  scale_y_continuous(breaks = c(100000, 200000, 300000, 400000),labels = c("100K", "200K", "300K", "400K")) +
+  labs(title = "Rides per month", x = "Month", y = "Ride count", fill = "Membership type") +
+  theme_minimal()
+```
+
+**Weekly ride rentals**
+
+```{r}
+daily_usage <- all_trips %>% 
+  group_by(member_casual) %>% 
+  count(day)
+
+#Arrange the days of the week in order.
+daily_usage$day <- factor(daily_usage$day, levels = c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"))
+
+ggplot(daily_usage, aes(fill=member_casual, x= day, y = n)) + 
+  geom_bar(position='dodge', stat='identity') +
+  scale_y_continuous(breaks = c(100000, 200000, 300000, 400000, 500000),labels = c("100K", "200K", "300K", "400K", "500k")) +
+  labs(title = "Rides per month", x = "Day of the week", y = "Ride count", fill = "Membership type") +
+  theme_minimal()
+```
+
+### Summary of Analysis
+
+1.  **Usage Patterns**: On average, casual riders utilize bikes more frequently than annual members.
+2.  **Bike Preferences**: Both casual and member users predominantly use classic and electric bikes, with minimal usage of docked bikes. Notably, annual members did not use docked bikes at all.
+3.  **Seasonal Trends**: Bike rentals peak during the summer months, from June to September, with elevated usage extending into October.
+4.  **Day-of-Week Trends**: Member users tend to ride more frequently on weekdays, while casual users show a significant increase in activity during weekends.
+
+### Recommendations
+
+1.  **Weekend Membership Plan**: Introduce a weekend-specific membership plan to attract casual riders who predominantly use bikes during weekends.
+2.  **Seasonal Discounts**: Offer discounted annual membership plans during the summer months to capitalize on the peak rental season and encourage conversions from casual riders.
+3.  **Incentivized Returns**: Implement a points-based system for annual members, rewarding riders who return bikes to designated stations. Points can be redeemed for discounts or benefits, encouraging better usage of docked bikes and targeting casual users to transition into membership plans. This came as a result of lots of bikes not returned to a station.
