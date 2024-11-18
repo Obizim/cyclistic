@@ -1,7 +1,7 @@
 ---
 title: "Cyclistic"
 author: "Zimuzo Obi"
-date: "2024-11-15"
+date: "2024-11-18"
 output: html_document
 ---
 
@@ -25,7 +25,7 @@ Three questions will guide the future marketing program:
 2.  Why would casual riders buy Cyclistic annual memberships?
 3.  How can Cyclistic use digital media to influence casual riders to become members?
 
-### Shareholders
+### Stakeholders
 
 -   Cyclistic Users
 -   Lily Moreno - Director of Marketing and Manager
